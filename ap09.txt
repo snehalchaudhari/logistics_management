@@ -1,0 +1,265 @@
+000100 IDENTIFICATION DIVISION.                                         00010000
+000200 PROGRAM-ID. P24AP09.                                             00020000
+000300 DATA DIVISION.                                                   00030000
+000400 WORKING-STORAGE SECTION.                                         00040000
+000500 01  WS-RESP-CODE             PIC S9(08) COMP VALUE ZERO.         00050000
+000600 01  WS-CA.                                                       00060000
+000700     03  WS-PROCESS-FLAG      PIC X(01) VALUE SPACES.             00070000
+000800         88  PROCESS-KEYMAP             VALUE '1'.                00080000
+000900         88  PROCESS-ADD                VALUE '2'.                00090000
+001000         88  PROCESS-UPD-DEL            VALUE '3'.                00100000
+001100         88  PROCESS-DETMAP             VALUE '2', '3'.           00110000
+001200     03  WS-DEAL-ID           PIC 9(02) VALUE ZERO.               00120000
+001300     03  WS-DEAL-NAME         PIC X(15) VALUE SPACES.             00130000
+001400 01  WS-VALID-FLAG            PIC X(01) VALUE 'N'.                00140000
+001500     88  VALID-DATA                     VALUE 'Y'.                00150000
+001600                                                                  00160000
+001700     COPY P24AS02.                                                00170000
+001800     COPY DFHAID.                                                 00180000
+001900     COPY DFHBMSCA.                                               00190000
+002000                                                                  00200000
+002100     EXEC SQL                                                     00210000
+002200         INCLUDE PROD                                             00220000
+002300     END-EXEC.                                                    00230000
+002400     EXEC SQL                                                     00240000
+002500         INCLUDE DEAL                                             00250000
+002600     END-EXEC.                                                    00260000
+002700     EXEC SQL                                                     00270000
+002800         INCLUDE SQLCA                                            00280000
+002900     END-EXEC.                                                    00290000
+003000                                                                  00300000
+003100 LINKAGE SECTION.                                                 00310000
+003200 01  DFHCOMMAREA              PIC X(18).                          00320000
+003300                                                                  00330000
+003400 PROCEDURE DIVISION.                                              00340000
+003500 MAIN-PARA.                                                       00350000
+003600     IF EIBCALEN = ZERO                                           00360000
+003700        PERFORM FIRST-PARA                                        00370000
+003800     ELSE                                                         00380000
+003900        MOVE DFHCOMMAREA TO WS-CA                                 00390000
+004000        PERFORM NEXT-PARA THRU NEXT-PARA-X                        00400000
+004100     END-IF.                                                      00410000
+004200                                                                  00420000
+004300 END-PARA.                                                        00430000
+004400     EXEC CICS RETURN                                             00440000
+004500          TRANSID('P24I')                                         00450000
+004600          COMMAREA(WS-CA)                                         00460000
+004700     END-EXEC.                                                    00470000
+004800                                                                  00480000
+004900 FIRST-PARA.                                                      00490000
+005000     MOVE LOW-VALUES TO DKEYMAPO                                  00500000
+005100     PERFORM SEND-FIRST-MAP.                                      00510000
+005200                                                                  00520000
+005300 SEND-FIRST-MAP.                                                  00530000
+005400     PERFORM SEND-KEY-MAP.                                        00540000
+005500     SET PROCESS-KEYMAP TO TRUE.                                  00550000
+005600                                                                  00560000
+005700 SEND-KEY-MAP.                                                    00570000
+005800     MOVE -1 TO DID4L                                             00580000
+005900     EXEC CICS SEND                                               00590000
+006000         MAP('DKEYMAP')                                           00600000
+006100         MAPSET('P24AS02')                                        00610000
+006200         FROM(DKEYMAPO)                                           00620000
+006300         CURSOR                                                   00630000
+006400         ERASE                                                    00640000
+006500     END-EXEC.                                                    00650000
+006600                                                                  00660000
+006700 NEXT-PARA.                                                       00670000
+006800     EVALUATE TRUE                                                00680000
+006900        WHEN PROCESS-KEYMAP                                       00690000
+007000           PERFORM PROCESS-KEYMAP-PARA                            00700000
+007100        WHEN PROCESS-DETMAP                                       00710000
+007200           PERFORM PROCESS-DETMAP-PARA                            00720000
+007300     END-EVALUATE.                                                00730000
+007400                                                                  00740000
+007500 SEND-PARA.                                                       00750000
+007600     EVALUATE TRUE                                                00760000
+007700        WHEN PROCESS-KEYMAP                                       00770000
+007800           PERFORM SEND-KEY-MAP                                   00780000
+007900        WHEN PROCESS-DETMAP                                       00790000
+008000           PERFORM SEND-DETAIL-MAP                                00800000
+008100     END-EVALUATE.                                                00810000
+008200                                                                  00820000
+008300 NEXT-PARA-X.                                                     00830000
+008400     EXIT.                                                        00840000
+008500                                                                  00850000
+008600 PROCESS-KEYMAP-PARA.                                             00860000
+008700     EVALUATE EIBAID                                              00870000
+008800        WHEN DFHENTER                                             00880000
+008900           PERFORM RECEIVE-PROCESS-KEYMAP                         00890000
+009000        WHEN DFHPF3                                               00900000
+009100           EXEC CICS XCTL                                         00910000
+009200              PROGRAM('P24AP02')                                  00920000
+009300           END-EXEC                                               00930000
+009400        WHEN OTHER                                                00940000
+009500           MOVE 'INVALID KEY PRESSED' TO MSG4O                    00950000
+009600     END-EVALUATE.                                                00960000
+009700                                                                  00970000
+009800 RECEIVE-PROCESS-KEYMAP.                                          00980000
+009900     PERFORM RECEIVE-KEY-MAP                                      00990000
+010000     IF DID4L = ZERO OR DID4I = SPACES                            01000000
+010100        MOVE 'PLEASE ENTER AN DEALER ID' TO MSG4O                 01010000
+010200     ELSE                                                         01020000
+010300        IF DID4I IS NOT NUMERIC                                   01030000
+010400           MOVE 'NUMERIC FIELD REQUIRED IN ID' TO MSG4O           01040000
+010500        ELSE                                                      01050000
+010600           PERFORM READ-DEALER                                    01060000
+010700        END-IF                                                    01070000
+010800     END-IF.                                                      01080000
+010900                                                                  01090000
+011000 RECEIVE-KEY-MAP.                                                 01100000
+011100     EXEC CICS RECEIVE                                            01110000
+011200         MAP('DKEYMAP')                                           01120000
+011300         MAPSET('P24AS02')                                        01130000
+011400         INTO(DKEYMAPI)                                           01140000
+011500     END-EXEC.                                                    01150000
+011600                                                                  01160000
+011700 READ-DEALER.                                                     01170000
+011800     MOVE LOW-VALUES TO DDETMAPO                                  01180000
+011900     MOVE DID4I TO WS-DEAL-ID, DID5O, DEAL-ID                     01190000
+012000     EXEC SQL                                                     01200000
+012100          SELECT DEAL_ID, DEAL_NAME                               01210000
+012200          INTO   :DEAL-ID, :DEAL-NAME                             01220000
+012300          FROM   T24_DEALER_TABLE                                 01230000
+012400          WHERE  DEAL_ID = :DEAL-ID                               01240000
+012500     END-EXEC                                                     01250000
+012600     EVALUATE SQLCODE                                             01260000
+012700         WHEN ZERO                                                01270000
+012800            MOVE DEAL-NAME         TO DNAME5O                     01280000
+012900            MOVE -1                TO DNAME5L                     01290000
+013000            SET PROCESS-UPD-DEL    TO TRUE                        01300000
+013100            MOVE DFHBMDAR          TO ADD3A                       01310000
+013200         WHEN 100                                                 01320000
+013300            MOVE -1                TO PNAME3L                     01330000
+013400            MOVE SPACES            TO DNAME5O                     01340000
+013500            SET PROCESS-ADD        TO TRUE                        01350000
+013600            MOVE DFHBMUNP          TO DNAME3A                     01360000
+013700            MOVE DFHBMDAR          TO UPDATE3A                    01370000
+013800            MOVE DFHBMDAR          TO DELETE3A                    01380000
+013900         WHEN OTHER                                               01390000
+014000            MOVE 'ERROR PROCESSING TABLE' TO MSG4O                01400000
+014100     END-EVALUATE.                                                01410000
+014200                                                                  01420000
+014300 SEND-DETAIL-MAP.                                                 01430000
+014400     EXEC CICS SEND                                               01440000
+014500         MAP('DDETMAP')                                           01450000
+014600         MAPSET('P24AS02')                                        01460000
+014700         FROM(DDETMAPO)                                           01470000
+014800         CURSOR                                                   01480000
+014900         ERASE                                                    01490000
+015000     END-EXEC.                                                    01500000
+015100                                                                  01510000
+015200 PROCESS-DETMAP-PARA.                                             01520000
+015300     EVALUATE EIBAID                                              01530000
+015400         WHEN DFHPF2                                              01540000
+015500            IF PROCESS-ADD                                        01550000
+015600               PERFORM ADD-PARA                                   01560000
+015700            ELSE                                                  01570000
+015800               MOVE 'PF2 NOT ENABLED' TO MSG5O                    01580000
+015900            END-IF                                                01590000
+016000         WHEN DFHPF3                                              01600000
+016100            EXEC CICS XCTL                                        01610000
+016200               PROGRAM('P24AP02')                                 01620000
+016300            END-EXEC                                              01630000
+016400         WHEN DFHPF4                                              01640000
+016500            IF PROCESS-UPD-DEL                                    01650000
+016600               PERFORM UPDATE-PARA                                01660000
+016700            ELSE                                                  01670000
+016800               MOVE 'PF4 NOT ENABLED' TO MSG5O                    01680000
+016900            END-IF                                                01690000
+017000         WHEN DFHPF5                                              01700000
+017100            IF PROCESS-UPD-DEL                                    01710000
+017200               PERFORM DELETE-PARA                                01720000
+017300            ELSE                                                  01730000
+017400               MOVE 'PF5 NOT ENABLED' TO MSG5O                    01740000
+017500            END-IF                                                01750000
+017600         WHEN DFHPF6                                              01760000
+017700            SET PROCESS-KEYMAP TO TRUE                            01770000
+017800         WHEN OTHER                                               01780000
+017900            MOVE 'INVALID KEY PRESSED' TO MSG5O                   01790000
+018000     END-EVALUATE.                                                01800000
+018100                                                                  01810000
+018200 RECEIVE-DETAIL-MAP.                                              01820000
+018300     EXEC CICS RECEIVE                                            01830000
+018400         MAP('DDETMAP')                                           01840000
+018500         MAPSET('P24AS02')                                        01850000
+018600         INTO(DDETMAPI)                                           01860000
+018700     END-EXEC.                                                    01870000
+018800                                                                  01880000
+018900 DELETE-PARA.                                                     01890000
+019000     MOVE DID5O TO WS-DEAL-ID, DEAL-ID                            01900000
+019100     EXEC SQL                                                     01910000
+019200          DELETE FROM T24_DEALER_TABLE                            01920000
+019300          WHERE DEAL_ID = :DEAL-ID                                01930000
+019400     END-EXEC                                                     01940000
+019500     EVALUATE SQLCODE                                             01950000
+019600         WHEN ZERO                                                01960000
+019700            MOVE 'DELETE SUCCESSFUL' TO MSG4O                     01970000
+019800         WHEN 100                                                 01980000
+019900            MOVE 'RECORD NOT FOUND' TO MSG4O                      01990000
+020000         WHEN OTHER                                               02000000
+020100            MOVE 'DELETE NOT SUCCESSFUL' TO MSG4O                 02010000
+020200     END-EVALUATE                                                 02020000
+020300     SET PROCESS-KEYMAP TO TRUE                                   02030000
+020400     MOVE WS-DEAL-ID TO DID4O.                                    02040000
+020500                                                                  02050000
+020600 ADD-PARA.                                                        02060000
+020700     PERFORM RECEIVE-DETAIL-MAP                                   02070000
+020800     PERFORM VALIDATE-PARA                                        02080000
+020900     IF VALID-DATA                                                02090000
+021000        PERFORM MOVE-PARA                                         02100000
+021100        PERFORM WRITE-PARA                                        02110000
+021200     END-IF.                                                      02120000
+021300                                                                  02130000
+021400 WRITE-PARA.                                                      02140000
+021500     EXEC SQL                                                     02150000
+021600          INSERT INTO T24_DEALER_TABLE                            02160000
+021700                (DEAL_ID, DEAL_NAME)                              02170000
+021800          VALUES(:DEAL-ID, :DEAL-NAME)                            02180000
+021900     END-EXEC                                                     02190000
+022000     EVALUATE SQLCODE                                             02200000
+022100         WHEN ZERO                                                02210000
+022200            MOVE 'ADD SUCCESSFUL' TO MSG4O                        02220000
+022300         WHEN OTHER                                               02230000
+022400            MOVE 'ADD NOT SUCCESSFUL' TO MSG4O                    02240000
+022500     END-EVALUATE                                                 02250000
+022600     SET PROCESS-KEYMAP TO TRUE                                   02260000
+022700     MOVE WS-DEAL-ID TO DID4O.                                    02270000
+022800                                                                  02280000
+022900 UPDATE-PARA.                                                     02290000
+023000     PERFORM RECEIVE-DETAIL-MAP                                   02300000
+023100     PERFORM VALIDATE-PARA                                        02310000
+023200     IF VALID-DATA                                                02320000
+023300        PERFORM MOVE-PARA                                         02330000
+023400        PERFORM REWRITE-PARA                                      02340000
+023500     END-IF.                                                      02350000
+023600                                                                  02360000
+023700 REWRITE-PARA.                                                    02370000
+023800     EXEC SQL                                                     02380000
+023900          UPDATE T24_DEALER_TABLE                                 02390000
+024000          SET DEAL_NAME = :WS-DEAL-NAME                           02400000
+024100          WHERE DEAL_ID = :DEAL-ID                                02410000
+024200     END-EXEC                                                     02420000
+024300     EVALUATE SQLCODE                                             02430000
+024400         WHEN ZERO                                                02440000
+024500            MOVE 'UPDATE SUCCESSFUL' TO MSG4O                     02450000
+024600         WHEN OTHER                                               02460000
+024700            MOVE 'ERROR PROCESSING TABLE' TO MSG5O                02470000
+024800     END-EVALUATE                                                 02480000
+024900     SET PROCESS-KEYMAP TO TRUE                                   02490000
+025000     MOVE WS-DEAL-ID TO DID4O.                                    02500000
+025100                                                                  02510000
+025200 VALIDATE-PARA.                                                   02520000
+025300     IF DNAME5L = ZERO                                            02530000
+025400        MOVE 'PLEASE ENTER DETAILS' TO MSG3O                      02540000
+025500     ELSE                                                         02550000
+025600        IF DNAME5I = SPACES                                       02560000
+025700           MOVE 'ENTER VALID DETAILS' TO MSG3O                    02570000
+025800        ELSE                                                      02580000
+025900           MOVE 'Y' TO WS-VALID-FLAG                              02590000
+026000        END-IF                                                    02600000
+026100     END-IF.                                                      02610000
+026200                                                                  02620000
+026300 MOVE-PARA.                                                       02630000
+026400     MOVE WS-DEAL-ID TO DEAL-ID                                   02640000
+026500     MOVE DNAME5I    TO DEAL-NAME, WS-DEAL-NAME.                  02650000

@@ -1,0 +1,330 @@
+000100 IDENTIFICATION DIVISION.                                         00010000
+000200 PROGRAM-ID. P24AP05.                                             00020000
+000300 DATA DIVISION.                                                   00030000
+000400                                                                  00040000
+000500 WORKING-STORAGE SECTION.                                         00050000
+000600 01  WS-RESP-CODE             PIC S9(08) COMP VALUE ZERO.         00060000
+000700 01  WS-CA.                                                       00070000
+000800     03  WS-PROCESS-FLAG      PIC X(01) VALUE SPACES.             00080000
+000900         88  PROCESS-KEYMAP             VALUE '1'.                00090000
+001000         88  PROCESS-ADD                VALUE '2'.                00100000
+001100         88  PROCESS-UPD-DEL            VALUE '3'.                00110000
+001200         88  PROCESS-DETMAP             VALUE '2', '3'.           00120000
+001300     03  WS-PROD-ID           PIC 9(03) VALUE ZERO.               00130000
+001400     03  WS-DEAL-NAME         PIC X(15) VALUE SPACES.             00140000
+001500                                                                  00150000
+001600     COPY P24AS02.                                                00160000
+001700     COPY DFHAID.                                                 00170000
+001800     COPY DFHBMSCA.                                               00180000
+001900                                                                  00190000
+002000     EXEC SQL                                                     00200000
+002100         INCLUDE PROD                                             00210000
+002200     END-EXEC.                                                    00220000
+002300     EXEC SQL                                                     00230000
+002400         INCLUDE DEAL                                             00240000
+002500     END-EXEC.                                                    00250000
+002600     EXEC SQL                                                     00260000
+002700         INCLUDE SQLCA                                            00270000
+002800     END-EXEC.                                                    00280000
+002900                                                                  00290000
+003000 01  WS-VALID-FLAG            PIC X(01) VALUE 'N'.                00300000
+003100     88  VALID-DATA                     VALUE 'Y'.                00310000
+003200                                                                  00320000
+003300 LINKAGE SECTION.                                                 00330000
+003400 01  DFHCOMMAREA              PIC X(19).                          00340000
+003500                                                                  00350000
+003600 PROCEDURE DIVISION.                                              00360000
+003700 MAIN-PARA.                                                       00370000
+003800     IF EIBCALEN = ZERO                                           00380000
+003900        PERFORM FIRST-PARA                                        00390000
+004000     ELSE                                                         00400000
+004100        MOVE DFHCOMMAREA TO WS-CA                                 00410000
+004200        PERFORM NEXT-PARA THRU NEXT-PARA-X                        00420000
+004300     END-IF.                                                      00430000
+004400                                                                  00440000
+004500 END-PARA.                                                        00450000
+004600     EXEC CICS RETURN                                             00460000
+004700          TRANSID('P24E')                                         00470000
+004800          COMMAREA(WS-CA)                                         00480000
+004900     END-EXEC.                                                    00490000
+005000                                                                  00500000
+005100 FIRST-PARA.                                                      00510000
+005200     MOVE LOW-VALUES TO PKEYMAPO                                  00520000
+005300     PERFORM SEND-FIRST-MAP.                                      00530000
+005400                                                                  00540000
+005500 SEND-FIRST-MAP.                                                  00550000
+005600     PERFORM SEND-KEY-MAP                                         00560000
+005700     SET PROCESS-KEYMAP TO TRUE.                                  00570000
+005800                                                                  00580000
+005900 SEND-KEY-MAP.                                                    00590000
+006000     MOVE -1 TO PID2L                                             00600000
+006100     EXEC CICS SEND                                               00610000
+006200         MAP('PKEYMAP')                                           00620000
+006300         MAPSET('P24AS02')                                        00630000
+006400         FROM(PKEYMAPO)                                           00640000
+006500         CURSOR                                                   00650000
+006600         ERASE                                                    00660000
+006700     END-EXEC.                                                    00670000
+006800                                                                  00680000
+006900 NEXT-PARA.                                                       00690000
+007000     EVALUATE TRUE                                                00700000
+007100        WHEN PROCESS-KEYMAP                                       00710000
+007200           PERFORM PROCESS-KEYMAP-PARA                            00720000
+007300        WHEN PROCESS-DETMAP                                       00730000
+007400           PERFORM PROCESS-DETMAP-PARA                            00740000
+007500     END-EVALUATE.                                                00750000
+007600                                                                  00760000
+007700 SEND-PARA.                                                       00770000
+007800     EVALUATE TRUE                                                00780000
+007900        WHEN PROCESS-KEYMAP                                       00790000
+008000           PERFORM SEND-KEY-MAP                                   00800000
+008100        WHEN PROCESS-DETMAP                                       00810000
+008200           PERFORM SEND-DETAIL-MAP                                00820000
+008300     END-EVALUATE.                                                00830000
+008400                                                                  00840000
+008500 NEXT-PARA-X.                                                     00850000
+008600     EXIT.                                                        00860000
+008700                                                                  00870000
+008800 PROCESS-KEYMAP-PARA.                                             00880000
+008900     EVALUATE EIBAID                                              00890000
+009000        WHEN DFHENTER                                             00900000
+009100           PERFORM RECEIVE-PROCESS-KEYMAP                         00910000
+009200        WHEN DFHPF3                                               00920000
+009300           EXEC CICS XCTL                                         00930000
+009400              PROGRAM('P24AP02')                                  00940000
+009500           END-EXEC                                               00950000
+009600        WHEN OTHER                                                00960000
+009700           MOVE 'INVALID KEY PRESSED' TO MSG2O                    00970000
+009800     END-EVALUATE.                                                00980000
+009900                                                                  00990000
+010000 RECEIVE-PROCESS-KEYMAP.                                          01000000
+010100     PERFORM RECEIVE-KEY-MAP                                      01010000
+010200     IF PID2L = ZERO OR PID2I = SPACES                            01020000
+010300        MOVE 'PLEASE ENTER AN PRODUCT ID' TO MSG2O                01030000
+010400     ELSE                                                         01040000
+010500        IF PID2I IS NOT NUMERIC                                   01050000
+010600           MOVE 'NUMERIC FIELD REQUIRED IN ID' TO MSG2O           01060000
+010700        ELSE                                                      01070000
+010800           PERFORM READ-PRODUCT                                   01080000
+010900        END-IF                                                    01090000
+011000     END-IF.                                                      01100000
+011100                                                                  01110000
+011200 RECEIVE-KEY-MAP.                                                 01120000
+011300     EXEC CICS RECEIVE                                            01130000
+011400         MAP('PKEYMAP')                                           01140000
+011500         MAPSET('P24AS02')                                        01150000
+011600         INTO(PKEYMAPI)                                           01160000
+011700     END-EXEC.                                                    01170000
+011800                                                                  01180000
+011900 READ-PRODUCT.                                                    01190000
+012000     MOVE LOW-VALUES TO PDETMAPO                                  01200000
+012100     MOVE PID2I TO WS-PROD-ID, PID3O, PROD-ID                     01210000
+012200     EXEC SQL                                                     01220000
+012300         SELECT PROD_ID, PROD_NAME, PROD_PRICE,                   01230000
+012400                PROD_MIN_QUANT, PROD_AVAIL_QUANT, DEAL_NAME       01240000
+012500         INTO   :PROD-ID, :PROD-NAME, :PROD-PRICE,                01250000
+012600                :PROD-MIN-QUANT, :PROD-AVAIL-QUANT, :DEAL-NAME    01260000
+012700         FROM   T24_PRODUCT_TABLE, T24_DEALER_TABLE               01270000
+012800         WHERE  PROD_DEAL_ID = DEAL_ID AND                        01280000
+012900                PROD_ID = :PROD-ID                                01290000
+013000     END-EXEC                                                     01300000
+013100     EVALUATE SQLCODE                                             01310000
+013200         WHEN ZERO                                                01320000
+013300            MOVE PROD-NAME         TO PNAME3O                     01330000
+013400            MOVE PROD-PRICE        TO PRS3O                       01340000
+013500            MOVE PROD-MIN-QUANT    TO MQUAN3O                     01350000
+013600            MOVE PROD-AVAIL-QUANT  TO AQUAN3O                     01360000
+013700            MOVE DEAL-NAME         TO DNAME3O                     01370000
+013800            MOVE -1                TO PNAME3L                     01380000
+013900            SET PROCESS-UPD-DEL    TO TRUE                        01390000
+014000            MOVE DFHBMDAR          TO ADD3A                       01400000
+014100         WHEN 100                                                 01410000
+014200            MOVE -1                TO PNAME3L                     01420000
+014300            MOVE SPACES            TO PNAME3O, PRS3O, MQUAN3O,    01430000
+014400                                      AQUAN3O, DNAME3O            01440000
+014500            SET PROCESS-ADD        TO TRUE                        01450000
+014600            MOVE DFHBMUNP          TO DNAME3A                     01460000
+014700            MOVE DFHBMDAR          TO UPDATE3A                    01470000
+014800            MOVE DFHBMDAR          TO DELETE3A                    01480000
+014900         WHEN OTHER                                               01490000
+015000            MOVE 'ERROR PROCESSING TABLE' TO MSG2O                01500000
+015100     END-EVALUATE.                                                01510000
+015200                                                                  01520000
+015300 SEND-DETAIL-MAP.                                                 01530000
+015400     EXEC CICS SEND                                               01540000
+015500         MAP('PDETMAP')                                           01550000
+015600         MAPSET('P24AS02')                                        01560000
+015700         FROM(PDETMAPO)                                           01570000
+015800         CURSOR                                                   01580000
+015900         ERASE                                                    01590000
+016000     END-EXEC.                                                    01600000
+016100                                                                  01610000
+016200 PROCESS-DETMAP-PARA.                                             01620000
+016300     EVALUATE EIBAID                                              01630000
+016400         WHEN DFHPF2                                              01640000
+016500            IF PROCESS-ADD                                        01650000
+016600               PERFORM ADD-PARA                                   01660000
+016700            ELSE                                                  01670000
+016800               MOVE 'PF2 NOT ENABLED' TO MSG2O                    01680000
+016900            END-IF                                                01690000
+017000         WHEN DFHPF3                                              01700000
+017100            EXEC CICS XCTL                                        01710000
+017200               PROGRAM('P24AP02')                                 01720000
+017300            END-EXEC                                              01730000
+017400         WHEN DFHPF4                                              01740000
+017500            IF PROCESS-UPD-DEL                                    01750000
+017600               PERFORM UPDATE-PARA                                01760000
+017700            ELSE                                                  01770000
+017800               MOVE 'PF4 NOT ENABLED' TO MSG2O                    01780000
+017900            END-IF                                                01790000
+018000         WHEN DFHPF5                                              01800000
+018100            IF PROCESS-UPD-DEL                                    01810000
+018200               PERFORM DELETE-PARA                                01820000
+018300            ELSE                                                  01830000
+018400               MOVE 'PF5 NOT ENABLED' TO MSG2O                    01840000
+018500            END-IF                                                01850000
+018600         WHEN DFHPF6                                              01860000
+018700            SET PROCESS-KEYMAP TO TRUE                            01870000
+018800         WHEN OTHER                                               01880000
+018900            MOVE 'INVALID KEY PRESSED' TO MSG2O                   01890000
+019000     END-EVALUATE.                                                01900000
+019100                                                                  01910000
+019200 RECEIVE-DETAIL-MAP.                                              01920000
+019300     EXEC CICS RECEIVE                                            01930000
+019400         MAP('PDETMAP')                                           01940000
+019500         MAPSET('P24AS02')                                        01950000
+019600         INTO(PDETMAPI)                                           01960000
+019700     END-EXEC.                                                    01970000
+019800                                                                  01980000
+019900 DELETE-PARA.                                                     01990000
+020000     MOVE PID3O TO WS-PROD-ID, PROD-ID                            02000000
+020100     EXEC SQL                                                     02010000
+020200          DELETE FROM T24_PRODUCT_TABLE                           02020000
+020300          WHERE PROD_ID = :PROD-ID                                02030000
+020400     END-EXEC                                                     02040000
+020500     EVALUATE SQLCODE                                             02050000
+020600         WHEN ZERO                                                02060000
+020700            MOVE 'DELETE SUCCESSFUL' TO MSG2O                     02070000
+020800         WHEN OTHER                                               02080000
+020900            MOVE 'DELETE NOT SUCCESSFUL' TO MSG2O                 02090000
+021000     END-EVALUATE                                                 02100000
+021100     SET PROCESS-KEYMAP TO TRUE                                   02110000
+021200     MOVE WS-PROD-ID TO PID2O.                                    02120000
+021300                                                                  02130000
+021400 ADD-PARA.                                                        02140000
+021500     PERFORM RECEIVE-DETAIL-MAP                                   02150000
+021600     PERFORM VALIDATE-PARA                                        02160000
+021700     IF VALID-DATA                                                02170000
+021800        PERFORM MOVE-PARA                                         02180000
+021900        PERFORM WRITE-PARA                                        02190000
+022000     END-IF.                                                      02200000
+022100                                                                  02210000
+022200 WRITE-PARA.                                                      02220000
+022300     EXEC SQL                                                     02230000
+022400          SELECT DEAL_ID                                          02240000
+022500          INTO   :DEAL-ID                                         02250000
+022600          FROM   T24_DEALER_TABLE                                 02260000
+022700          WHERE  DEAL_NAME = :WS-DEAL-NAME                        02270000
+022800     END-EXEC                                                     02280000
+022900     EVALUATE SQLCODE                                             02290000
+023000          WHEN ZERO                                               02300000
+023100               PERFORM INSERT-INTO-TABLE                          02310000
+023200          WHEN OTHER                                              02320000
+023300               MOVE 'UNKNOWN ERROR' TO MSG3O                      02330000
+023400     END-EVALUATE.                                                02340000
+023500                                                                  02350000
+023600 INSERT-INTO-TABLE.                                               02360000
+023700     EXEC SQL                                                     02370000
+023800          INSERT INTO T24_PRODUCT_TABLE                           02380000
+023900                 (PROD_ID, PROD_NAME, PROD_PRICE, PROD_MIN_QUANT, 02390000
+024000                  PROD_AVAIL_QUANT, PROD_DEAL_ID)                 02400000
+024100          VALUES (:PROD-ID, :PROD-NAME, :PROD-PRICE,              02410000
+024200                  :PROD-MIN-QUANT, :PROD-AVAIL-QUANT, :DEAL-ID)   02420000
+024300     END-EXEC                                                     02430000
+024400     EVALUATE SQLCODE                                             02440000
+024500         WHEN ZERO                                                02450000
+024600            MOVE 'ADD SUCCESSFUL' TO MSG2O                        02460000
+024700         WHEN OTHER                                               02470000
+024800            MOVE 'ADD NOT SUCCESSFUL' TO MSG2O                    02480000
+024900     END-EVALUATE                                                 02490000
+025000     SET PROCESS-KEYMAP TO TRUE                                   02500000
+025100     MOVE WS-PROD-ID TO PID2O.                                    02510000
+025200                                                                  02520000
+025300 UPDATE-PARA.                                                     02530000
+025400     PERFORM RECEIVE-DETAIL-MAP                                   02540000
+025500     PERFORM VALIDATE-PARA                                        02550000
+025600     IF VALID-DATA                                                02560000
+025700        PERFORM MOVE-PARA                                         02570000
+025800        PERFORM REWRITE-PARA                                      02580000
+025900     END-IF.                                                      02590000
+026000                                                                  02600000
+026100 REWRITE-PARA.                                                    02610000
+026200     EXEC SQL                                                     02620000
+026300          UPDATE T24_PRODUCT_TABLE                                02630000
+026400          SET PROD_NAME = :PROD-NAME,                             02640000
+026500              PROD_PRICE = :PROD-PRICE,                           02650000
+026600              PROD_MIN_QUANT = :PROD-MIN-QUANT,                   02660000
+026700              PROD_AVAIL_QUANT = :PROD-AVAIL-QUANT                02670000
+026800          WHERE PROD_ID = :PROD-ID                                02680000
+026900     END-EXEC                                                     02690000
+027000     EVALUATE SQLCODE                                             02700000
+027100          WHEN ZERO                                               02710000
+027200               MOVE 'UPDATE SUCCESSFUL' TO MSG2O                  02720000
+027300          WHEN OTHER                                              02730000
+027400               MOVE 'ERROR PROCESSING TABLE' TO MSG2O             02740000
+027500     END-EVALUATE                                                 02750000
+027600     SET PROCESS-KEYMAP TO TRUE                                   02760000
+027700     MOVE WS-PROD-ID TO PID2O.                                    02770000
+027800                                                                  02780000
+027900 VALIDATE-PARA.                                                   02790000
+028000     IF PNAME3L = ZERO OR                                         02800000
+028100        PRS3L   = ZERO OR                                         02810000
+028200        MQUAN3L = ZERO OR                                         02820000
+028300        AQUAN3L = ZERO OR                                         02830000
+028400        DNAME3L = ZERO                                            02840000
+028500        MOVE 'PLEASE ENTER DETAILS' TO MSG3O                      02850000
+028600     ELSE                                                         02860000
+028700        IF PNAME3I = SPACES OR                                    02870000
+028800           PRS3I   = SPACES OR                                    02880000
+028900           MQUAN3I = SPACES OR                                    02890000
+029000           AQUAN3I = SPACES OR                                    02900000
+029100           DNAME3I = SPACES                                       02910000
+029200           MOVE 'ENTER VALID DETAILS' TO MSG3O                    02920000
+029300        ELSE                                                      02930000
+029400           IF PNAME3I IS NOT NUMERIC                              02940000
+029500              IF PRS3I IS NUMERIC                                 02950000
+029600                 IF MQUAN3I IS NUMERIC                            02960000
+029700                    IF AQUAN3I IS NUMERIC                         02970000
+029800                       IF DNAME3I IS NOT NUMERIC                  02980000
+029900                          MOVE 'Y' TO WS-VALID-FLAG               02990000
+030000                       ELSE                                       03000000
+030100                          MOVE -1 TO DNAME3L                      03010000
+030200                     MOVE 'DEALER NAME CANNOT BE NUMERIC' TO MSG3O03020000
+030300                       END-IF                                     03030000
+030400                    ELSE                                          03040000
+030500                       MOVE -1 TO AQUAN3L                         03050000
+030600                  MOVE 'NUMERIC FIELDS REQUIRED IN ORDER' TO MSG3O03060000
+030700                    END-IF                                        03070000
+030800                 ELSE                                             03080000
+030900                    MOVE -1 TO MQUAN3L                            03090000
+031000               MOVE 'NUMERIC FIELDS REQUIRED IN QUANTITY' TO MSG3O03100000
+031100                 END-IF                                           03110000
+031200              ELSE                                                03120000
+031300                 MOVE -1 TO PRS3L                                 03130000
+031400               MOVE 'NUMERIC FIELDS REQUIRED IN PRICE' TO MSG3O   03140000
+031500              END-IF                                              03150000
+031600           ELSE                                                   03160000
+031700              MOVE -1 TO PNAME3L                                  03170000
+031800              MOVE 'PRODUCT NAME CANNOT BE NUMERIC' TO MSG3O      03180000
+031900           END-IF                                                 03190000
+032000        END-IF                                                    03200000
+032100     END-IF.                                                      03210000
+032200                                                                  03220000
+032300 MOVE-PARA.                                                       03230000
+032400     MOVE WS-PROD-ID TO PROD-ID                                   03240000
+032500     MOVE PNAME3I    TO PROD-NAME                                 03250000
+032600     MOVE PRS3I      TO PROD-PRICE                                03260000
+032700     MOVE MQUAN3I    TO PROD-MIN-QUANT                            03270000
+032800     MOVE AQUAN3I    TO PROD-AVAIL-QUANT                          03280000
+032900     MOVE DNAME3I    TO DEAL-NAME                                 03290000
+033000     MOVE DEAL-NAME  TO WS-DEAL-NAME.                             03300000
